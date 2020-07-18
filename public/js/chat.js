@@ -10,19 +10,39 @@ const $messages = document.querySelector('#messages')
 //Templates
 const messageTemplate = document.querySelector('#message-template').innerHTML
 const locationMessageTemplate = document.querySelector('#location-message-template').innerHTML
+const sideBarTemplate = document.querySelector('#sidebar-template').innerHTML
 
 //options
-const { username, room } = qs.parse(location.search, { ignoreQueryPrefix: true})
+const { username, room } = Qs.parse(location.search, { ignoreQueryPrefix: true})
 
+const autoscroll = () => {
+    const $newMessage = $messages.lastElementChild
+
+    const newMessageStyles = getComputedStyle($newMessage)
+    const newMessageMargin = parseInt(newMessageStyles.marginBottom)
+    const newMessageHeight = $newMessage.offsetHeight + newMessageMargin
+
+    const visibleHeight = $messages.offsetHeight
+    
+    const containerHeight = $messages.scrollHeight
+
+    const scrollOffset = $messages.scrollTop + visibleHeight
+
+    if(containerHeight - newMessageHeight <= scrollOffset) {
+        $messages.scrollTop = $messages.scrollHeight
+    }
+}
 
 socket.on('message', (message) => {
     console.log(message)
-    $messages.insertAdjacentHTML('beforeend', html)
+
     const html = Mustache.render(messageTemplate, {
+        username: message.username,
         message: message.text,
         createdAt: moment(message.createdAt).format('h:mm a')
     })
-    $messages.insertAdjacentHTML('beforebegin', html);
+    $messages.insertAdjacentHTML('beforeend', html)
+    autoscroll()
 })
 
 socket.on('locationMessage', (message) => {
@@ -31,7 +51,16 @@ socket.on('locationMessage', (message) => {
         url: message.url,
         createdAt: moment(message.createdAt).format('h:mm a')
     })
-    $messages.insertAdjacentHTML('beforebegin', html);
+    $messages.insertAdjacentHTML('beforeend', html);
+    autoscroll()
+})
+
+socket.on('roomData', ({ room, users }) => {
+    const html = Mustache.render(sideBarTemplate, {
+        room,
+        users
+    })
+    document.querySelector('#sidebar').innerHTML = html
 })
 
 $messageForm.addEventListener('submit', (e) => {
@@ -51,7 +80,7 @@ $messageForm.addEventListener('submit', (e) => {
 
 $locationButton.addEventListener('click', () => {
     if(!navigator.geolocation) {
-        console.log("Your browser does not support navigation!")
+        return alert("Your browser does not support navigation!")
     }
     $locationButton.setAttribute('disabled', 'disabled')
     //enable
@@ -60,8 +89,8 @@ $locationButton.addEventListener('click', () => {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
         }, () => {
-            console.log('Location Shared!');
             $locationButton.removeAttribute('disabled')
+            console.log('Location Shared!');
         })
     }) 
 })
